@@ -47,3 +47,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libusb-1.0-0-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+# Install Python dependencies
+RUN pip3 install --break-system-packages --no-cache-dir \
+    empy==3.3.4 \
+    colcon-common-extensions \
+    colcon-ros-cargo
