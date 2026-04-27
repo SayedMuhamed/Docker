@@ -32,3 +32,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libusb-1.0-0-dev \
     libc6-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Move libraries to a "sysroot" folder for the next stage
+RUN mkdir -p /sysroot/opt/ros/ \
+    && cp -r /opt/ros/jazzy /sysroot/opt/ros/jazzy-arm64 \
+    && mkdir -p /sysroot/usr/include \
+    && cp -r /usr/include/aarch64-linux-gnu /sysroot/usr/include/ \
+    && cp -r /usr/include/libusb-1.0 /sysroot/usr/include/ 2>/dev/null || true \
+    && mkdir -p /sysroot/usr/lib \
+    && cp -r /usr/lib/aarch64-linux-gnu /sysroot/usr/lib/ \
+    && mkdir -p /sysroot/lib \
+    && cp -r /lib/aarch64-linux-gnu /sysroot/lib/ \
+    && mkdir -p /sysroot/usr/share/pkgconfig \
+    && cp -r /usr/share/pkgconfig /sysroot/usr/share/
