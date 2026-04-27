@@ -1,0 +1,25 @@
+# ==========================================
+# Native AMD64 Development Image
+# ==========================================
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF_8
+
+# Install Build Tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales \
+    curl \
+    gnupg2 \
+    lsb-release \
+    build-essential \
+    cmake \
+    git \
+    python3-pip \
+    libpython3-dev \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF_8 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
