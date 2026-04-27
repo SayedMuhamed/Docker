@@ -45,3 +45,32 @@ RUN mkdir -p /sysroot/opt/ros/ \
     && cp -r /lib/aarch64-linux-gnu /sysroot/lib/ \
     && mkdir -p /sysroot/usr/share/pkgconfig \
     && cp -r /usr/share/pkgconfig /sysroot/usr/share/
+
+# ==========================================
+# STAGE 2: Final Development Image (AMD64 Host)
+# ==========================================
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
+# Install Native (AMD64) Build Tools & Cross Compilers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales \
+    curl \
+    gnupg2 \
+    lsb-release \
+    build-essential \
+    cmake \
+    git \
+    python3-pip \
+    libpython3-dev \
+    crossbuild-essential-arm64 \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
