@@ -53,3 +53,15 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     empy==3.3.4 \
     colcon-common-extensions \
     colcon-ros-cargo
+
+# Setup Workspace
+RUN rosdep init || true \
+    && rosdep update
+
+RUN mkdir -p /workspace/src
+WORKDIR /workspace
+
+# Add sourcing to bashrc
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc
+
+CMD ["bash"]
