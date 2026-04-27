@@ -1,0 +1,125 @@
+# ==========================================
+# STAGE 1: ARM64 Sysroot Builder
+# Downloads ARM libraries to a temporary location
+# ==========================================
+ARG SYSROOT_PLATFORM=linux/arm64
+FROM --platform=${SYSROOT_PLATFORM} ubuntu:24.04 AS sysroot-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install ARM64 packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl gnupg2 lsb-release ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add ROS2 repository
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" > /etc/apt/sources.list.d/ros2.list
+
+# Install ARM64 ROS2 & System Libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-ros-base \
+    ros-jazzy-sensor-msgs \
+    ros-jazzy-std-msgs \
+    ros-jazzy-geometry-msgs \
+    ros-jazzy-diagnostic-updater \
+    ros-jazzy-diagnostic-msgs \
+    ros-jazzy-rtcm-msgs \
+    ros-jazzy-example-interfaces \
+    libpython3-dev \
+    libserial-dev \
+    libcurl4-openssl-dev \
+    libusb-1.0-0-dev \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Move libraries to a "sysroot" folder for the next stage
+RUN mkdir -p /sysroot/opt/ros/ \
+    && cp -r /opt/ros/jazzy /sysroot/opt/ros/jazzy-arm64 \
+    && mkdir -p /sysroot/usr/include \
+    && cp -r /usr/include/aarch64-linux-gnu /sysroot/usr/include/ \
+    && cp -r /usr/include/libusb-1.0 /sysroot/usr/include/ 2>/dev/null || true \
+    && mkdir -p /sysroot/usr/lib \
+    && cp -r /usr/lib/aarch64-linux-gnu /sysroot/usr/lib/ \
+    && mkdir -p /sysroot/lib \
+    && cp -r /lib/aarch64-linux-gnu /sysroot/lib/ \
+    && mkdir -p /sysroot/usr/share/pkgconfig \
+    && cp -r /usr/share/pkgconfig /sysroot/usr/share/
+
+# ==========================================
+# STAGE 2: Final Development Image (AMD64 Host)
+# ==========================================
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
+# Install Native (AMD64) Build Tools & Cross Compilers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales \
+    curl \
+    gnupg2 \
+    lsb-release \
+    build-essential \
+    cmake \
+    git \
+    python3-pip \
+    libpython3-dev \
+    crossbuild-essential-arm64 \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Add ROS2 Repo (Native/AMD64)
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" > /etc/apt/sources.list.d/ros2.list
+
+# Install Native ROS2 (AMD64) - build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-ros-base \
+    ros-jazzy-rosidl-default-generators \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install Python dependencies
+RUN pip3 install --break-system-packages --no-cache-dir \
+    empy==3.3.4 \
+    colcon-common-extensions \
+    colcon-ros-cargo
+
+# COPY the ARM64 libraries from Stage 1
+COPY --from=sysroot-builder /sysroot/opt/ros/jazzy-arm64 /opt/ros/jazzy-arm64
+COPY --from=sysroot-builder /sysroot/usr/include/aarch64-linux-gnu /usr/include/aarch64-linux-gnu
+COPY --from=sysroot-builder /sysroot/usr/include/libusb-1.0 /usr/include/libusb-1.0
+COPY --from=sysroot-builder /sysroot/usr/lib/aarch64-linux-gnu /usr/lib/aarch64-linux-gnu
+COPY --from=sysroot-builder /sysroot/usr/share/pkgconfig /usr/share/pkgconfig
+
+
+# Create symlink so the build system sees the standard path matching the target board
+RUN ln -s /opt/ros/jazzy-arm64 /opt/ros/jazzy
+
+# Setup pkg-config for cross-compilation
+ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+ENV PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+
+# Setup Workspace
+RUN rosdep init || true \
+    && rosdep update
+
+RUN mkdir -p /workspace/src
+WORKDIR /workspace
+
+# Copy Toolchain
+COPY cmake_toolchain/cross-toolchain.cmake /workspace/cmake_toolchain/
+
+# Add sourcing to bashrc
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc
+
+CMD ["bash"]
