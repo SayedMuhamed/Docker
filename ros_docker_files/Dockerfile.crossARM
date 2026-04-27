@@ -1,0 +1,34 @@
+# ==========================================
+# STAGE 1: ARM64 Sysroot Builder
+# Downloads ARM libraries to a temporary location
+# ==========================================
+ARG SYSROOT_PLATFORM=linux/arm64
+FROM --platform=${SYSROOT_PLATFORM} ubuntu:24.04 AS sysroot-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install ARM64 packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl gnupg2 lsb-release ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add ROS2 repository
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" > /etc/apt/sources.list.d/ros2.list
+
+# Install ARM64 ROS2 & System Libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-ros-base \
+    ros-jazzy-sensor-msgs \
+    ros-jazzy-std-msgs \
+    ros-jazzy-geometry-msgs \
+    ros-jazzy-diagnostic-updater \
+    ros-jazzy-diagnostic-msgs \
+    ros-jazzy-rtcm-msgs \
+    ros-jazzy-example-interfaces \
+    libpython3-dev \
+    libserial-dev \
+    libcurl4-openssl-dev \
+    libusb-1.0-0-dev \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
